@@ -1,4 +1,5 @@
-from sqlalchemy import Column, Integer, String
+from sqlalchemy import Column, Integer, String, Boolean, TIMESTAMP, text, func
+from sqlalchemy.dialects.postgresql import UUID
 from .database import Base
 
 class User(Base):
@@ -18,3 +19,10 @@ class Student(Base):
     name = Column(String, index=True)
     email = Column(String, unique=True, index=True)
     is_active = Column(Boolean, default=True)
+
+class ModuleContent(Base):
+    __tablename__ = "module_content"
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
+    content = Column(String, nullable=True)
+    title = Column(String, nullable=True)
