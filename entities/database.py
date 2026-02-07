@@ -5,9 +5,8 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL environment variable is not set. Please check your .env file.")
+# Use SQLite for local dev when DATABASE_URL is not set (e.g. frontend testing)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./intelligrade.db")
 
 engine = create_engine(DATABASE_URL)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
