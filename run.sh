@@ -5,17 +5,26 @@ set -e
 
 echo "🚀 Starting setup..."
 
-# Activate virtual environment if it exists
+# Use venv or .venv if present (call executables directly so PATH isn't required)
+VENV_BIN=
 if [ -d ".venv" ]; then
-    echo "Creating virtual environment context..."
-    source .venv/bin/activate
+    echo "Using .venv..."
+    VENV_BIN=".venv/bin"
+elif [ -d "venv" ]; then
+    echo "Using venv..."
+    VENV_BIN="venv/bin"
 else
-    echo "⚠️  No .venv directory found. Assuming dependencies are installed globally or in another environment."
+    echo "⚠️  No venv or .venv found. Using PATH for alembic/uvicorn."
 fi
 
 # Run database migrations
 echo "🔄 Running database migrations..."
-if alembic upgrade head; then
+if [ -n "$VENV_BIN" ]; then
+    RUN_ALEMBIC="$VENV_BIN/alembic"
+else
+    RUN_ALEMBIC="alembic"
+fi
+if $RUN_ALEMBIC upgrade head; then
     echo "✅ Migrations applied successfully!"
 else
     echo "❌ Migration failed!"
@@ -24,4 +33,8 @@ fi
 
 # Start the FastAPI application
 echo "🌟 Starting Intelligrade Server..."
-uvicorn main:app --reload
+if [ -n "$VENV_BIN" ]; then
+    exec "$VENV_BIN/uvicorn" main:app --reload
+else
+    exec uvicorn main:app --reload
+fi

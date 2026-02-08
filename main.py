@@ -7,6 +7,8 @@ from engines.question_engine import router as question_engine_router
 from engines.evaluation_engine import router as evaluation_engine_router
 from engines.score_engine import router as score_engine_router
 from engines.content_loading import router as content_loading_router
+from engines.quiz_engine import router as quiz_router
+from engines.progress import router as progress_router
 
 app = FastAPI()
 
@@ -25,6 +27,8 @@ app.include_router(question_engine_router.router)
 app.include_router(evaluation_engine_router.router)
 app.include_router(score_engine_router.router)
 app.include_router(content_loading_router.router)
+app.include_router(quiz_router.router)
+app.include_router(progress_router.router)
 
 @app.get("/")
 def read_root():
