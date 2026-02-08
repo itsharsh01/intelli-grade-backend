@@ -20,13 +20,13 @@ class GenAIService:
             cls._instance = cls()
         return cls._instance
 
-    def generate_response(self, prompt: str, model: str = "gemini-2.0-flash"):
+    def generate_response(self, prompt: str, model: str = "gemini-3-flash-preview"):
         """
         Generates content using the specified model.
         
         Args:
             prompt (str): The input prompt for the model.
-            model (str): The model to use (default: gemini-2.0-flash).
+            model (str): The model to use (default: gemini-3-flash-preview).
             
         Returns:
             str: The generated text response.
