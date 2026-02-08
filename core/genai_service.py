@@ -20,13 +20,14 @@ class GenAIService:
             cls._instance = cls()
         return cls._instance
 
-    def generate_response(self, prompt: str, model: str = "gemini-3-flash-preview"):
+    def generate_response(self, prompt: str, model: str = "gemini-3-flash-preview", config: dict = None):
         """
         Generates content using the specified model.
         
         Args:
             prompt (str): The input prompt for the model.
             model (str): The model to use (default: gemini-3-flash-preview).
+            config (dict, optional): Configuration for generation (e.g., response_mime_type).
             
         Returns:
             str: The generated text response.
@@ -34,7 +35,8 @@ class GenAIService:
         try:
             response = self.client.models.generate_content(
                 model=model,
-                contents=prompt
+                contents=prompt,
+                config=config
             )
             return response.text
         except Exception as e:

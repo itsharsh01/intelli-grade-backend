@@ -1,7 +1,9 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, UUID4
 from typing import List, Optional, Dict, Any
 
 class EvaluationRequest(BaseModel):
+    user_id: int
+    module_content_id: Optional[UUID4] = None
     module_context: Optional[Dict[str, Any]] = None
     question_context: Optional[Dict[str, Any]] = None
     user_answer: str
