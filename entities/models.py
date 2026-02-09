@@ -131,3 +131,21 @@ class Score(Base):
     feedback = Column(String, nullable=True)
     
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
+
+
+class Course(Base):
+    __tablename__ = "courses"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    title = Column(String, nullable=False)
+    description = Column(String, nullable=True)
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
+
+
+class CourseUser(Base):
+    __tablename__ = "course_users"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    course_id = Column(UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    joined_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
