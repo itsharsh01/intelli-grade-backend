@@ -73,10 +73,15 @@ class AggregatedScores(BaseModel):
 
 
 class QuizResultResponse(BaseModel):
-    per_question: list[PerQuestionResult]
-    aggregated_scores: AggregatedScores
-    strengths: list[str]
-    weak_areas: list[str]
+    total_questions: int
+    total_attempted: int
+    is_complete: bool
+    questions_needed: int = 0
+    correctness_percentage: float | None = None
+    per_question: list[PerQuestionResult] | None = None
+    aggregated_scores: AggregatedScores | None = None
+    strengths: list[str] | None = None
+    weak_areas: list[str] | None = None
 
 
 # ----- Create question (question bank) -----

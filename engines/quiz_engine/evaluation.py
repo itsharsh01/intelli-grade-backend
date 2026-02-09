@@ -95,6 +95,9 @@ def evaluate_objective_attempt(
     else:
         correctness = Decimal("0")
 
+    # Store correctness score for the attempt
+    attempt.correctness_score = correctness
+
     result = EvaluationResult(
         attempt_id=attempt.id,
         correctness=correctness,
@@ -158,7 +161,8 @@ def build_subjective_prompt(question_text: str, rubric: object, user_answer: str
     """
     rubric_str = json.dumps(rubric, indent=2) if rubric else "{}"
     context = (module_context or "").strip()[:3000]
-    return f"""You are an evaluator for a learning platform. Evaluate the following subjective answer strictly.
+    return f"""You are an evaluator for a learning platform. Evaluate the following subjective answer with very low leniency. 
+Be extremely strict and objective. If the answer is partially incorrect, missing key concepts, or vague, reduce the correctness score significantly.
 
 Module context (for reference only):
 {context or "No additional context."}
@@ -186,9 +190,14 @@ def create_subjective_evaluation_result(
     parsed: dict,
 ) -> EvaluationResult:
     """Create EvaluationResult from parsed AI output for a subjective attempt."""
+    correctness = Decimal(str(parsed["correctness"]))
+    
+    # Store simple correctness score for the attempt
+    attempt.correctness_score = correctness
+    
     result = EvaluationResult(
         attempt_id=attempt.id,
-        correctness=Decimal(str(parsed["correctness"])),
+        correctness=correctness,
         conceptual_depth=Decimal(str(parsed["conceptual_depth"])),
         reasoning_quality=Decimal(str(parsed["reasoning_quality"])),
         confidence_alignment=Decimal(str(parsed["confidence_alignment"])),

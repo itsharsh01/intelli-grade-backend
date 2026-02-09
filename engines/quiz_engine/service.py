@@ -34,36 +34,66 @@ from .schemas import (
     CreateQuestionRequest,
     CreateQuestionResponse,
 )
+from .ai_evaluation import get_module_context_for_evaluation
+
+# Integration with Evaluation Engine
+from engines.evaluation_engine.service import evaluate_answer
+from engines.evaluation_engine.schemas import EvaluationRequest
 
 
 def start_quiz(db: Session, user_id: int, module_id: UUID) -> StartQuizResponse:
     """
-    Create a new quiz session: select questions by module size and distribution,
-    persist session with fixed question_ids, return session id and questions (no answers).
+    Start or resume a quiz session:
+    - If an incomplete session exists for this user+module, resume it
+    - Otherwise, create a new session with selected questions
+    - Only returns questions that haven't been attempted yet in the session
     """
-    question_ids = select_questions_for_session(db, module_id)
-    if not question_ids:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="No questions found for this module.",
+    # Check for existing incomplete session (completed_at is NULL)
+    existing_session = db.query(QuizSession).filter(
+        QuizSession.user_id == user_id,
+        QuizSession.module_id == module_id,
+        QuizSession.completed_at.is_(None)
+    ).order_by(QuizSession.started_at.desc()).first()
+    
+    if existing_session:
+        # Resume existing session
+        session = existing_session
+        question_ids = [UUID(x) if isinstance(x, str) else x for x in (session.question_ids or [])]
+    else:
+        # Create new session
+        question_ids = select_questions_for_session(db, module_id)
+        if not question_ids:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="No questions found for this module.",
+            )
+        session = QuizSession(
+            user_id=user_id,
+            module_id=module_id,
+            question_ids=[str(q) for q in question_ids],
         )
-    session = QuizSession(
-        user_id=user_id,
-        module_id=module_id,
-        question_ids=[str(q) for q in question_ids],
+        db.add(session)
+        db.commit()
+        db.refresh(session)
+
+    # Get already attempted question IDs for this session
+    attempted_question_ids = set(
+        row[0] for row in db.query(QuestionAttempt.question_id)
+        .filter(QuestionAttempt.quiz_session_id == session.id)
+        .all()
     )
-    db.add(session)
-    db.commit()
-    db.refresh(session)
+
+    # Filter out attempted questions
+    unattempted_question_ids = [qid for qid in question_ids if qid not in attempted_question_ids]
 
     questions = (
         db.query(Question)
-        .filter(Question.id.in_(question_ids))
+        .filter(Question.id.in_(unattempted_question_ids))
         .all()
     )
     # Preserve order of question_ids
     by_id = {q.id: q for q in questions}
-    ordered = [by_id[qid] for qid in question_ids if qid in by_id]
+    ordered = [by_id[qid] for qid in unattempted_question_ids if qid in by_id]
     question_outs = [
         QuizQuestionOut(
             id=q.id,
@@ -140,6 +170,7 @@ def submit_answer(
             evaluated = True
         else:
             # Fail gracefully: store under-score default so result endpoint still works
+            attempt.correctness_score = Decimal("0")
             default = EvaluationResult(
                 attempt_id=attempt.id,
                 correctness=Decimal("0"),
@@ -152,15 +183,41 @@ def submit_answer(
             db.add(default)
             attempt.evaluated_at = datetime.now(timezone.utc)
             evaluated = True
+    
     # Mark quiz session complete when all questions have been answered
     attempt_count = db.query(QuestionAttempt).filter(QuestionAttempt.quiz_session_id == quiz_session_id).count()
     if attempt_count >= len(qids):
         session.completed_at = datetime.now(timezone.utc)
+    
     db.commit()
+
+    # Centralized Scoring: Send result to Evaluation Engine for cross-engine score aggregation
+    # Fetch context to provide to the evaluation engine
+    module_context_str = get_module_context_for_evaluation(db, question.module_id)
+    
+    eval_req = EvaluationRequest(
+        user_id=user_id,
+        module_content_id=question.module_id,
+        module_context={"content": module_context_str} if module_context_str else None,
+        question_context={
+            "question_text": question.question_text,
+            "question_type": question.question_type,
+            "options": question.options
+        },
+        user_answer=user_answer
+    )
+    
+    try:
+        # This will re-evaluate with Gemini (as requested) and save the score centrally in Score Engine
+        evaluate_answer(db, eval_req)
+    except Exception:
+        # We don't want the quiz submission to fail if the central scoring fails
+        pass
+
     return SubmitAnswerResponse(
         attempt_id=attempt.id,
         evaluated=evaluated,
-        message="Answer recorded.",
+        message="Answer recorded and score synced.",
     )
 
 
@@ -184,7 +241,20 @@ def get_quiz_result(db: Session, user_id: int, quiz_session_id: UUID) -> QuizRes
         .all()
     )
 
+    total_q = len(session.question_ids or [])
+    total_a = len(attempts)
+    is_complete = total_a >= total_q
+
+    if not is_complete:
+        return QuizResultResponse(
+            total_questions=total_q,
+            total_attempted=total_a,
+            is_complete=False,
+            questions_needed=total_q - total_a,
+        )
+
     per_question: list[PerQuestionResult] = []
+    total_correctness = 0.0
     for attempt, question, result in attempts:
         if not result:
             per_question.append(
@@ -200,11 +270,14 @@ def get_quiz_result(db: Session, user_id: int, quiz_session_id: UUID) -> QuizRes
                 )
             )
             continue
+        
+        c_val = float(result.correctness)
+        total_correctness += c_val
         per_question.append(
             PerQuestionResult(
                 question_id=question.id,
                 question_type=question.question_type,
-                correctness=float(result.correctness),
+                correctness=c_val,
                 conceptual_depth=float(result.conceptual_depth) if result.conceptual_depth is not None else None,
                 reasoning_quality=float(result.reasoning_quality) if result.reasoning_quality is not None else None,
                 confidence_alignment=float(result.confidence_alignment) if result.confidence_alignment is not None else None,
@@ -215,8 +288,16 @@ def get_quiz_result(db: Session, user_id: int, quiz_session_id: UUID) -> QuizRes
 
     aggregated = aggregate_results(per_question)
     strengths, weak_areas = infer_strengths_weak_areas(per_question, aggregated.composite)
+    
+    # Calculate percentage
+    avg_correctness = total_correctness / total_q if total_q > 0 else 0.0
+    percentage = round(avg_correctness * 100, 2)
 
     return QuizResultResponse(
+        total_questions=total_q,
+        total_attempted=total_a,
+        is_complete=True,
+        correctness_percentage=percentage,
         per_question=per_question,
         aggregated_scores=aggregated,
         strengths=strengths,

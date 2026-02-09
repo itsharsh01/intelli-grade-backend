@@ -90,7 +90,8 @@ class QuestionAttempt(Base):
     quiz_session_id = Column(UUID(as_uuid=True), ForeignKey("quiz_sessions.id", ondelete="CASCADE"), nullable=False, index=True)
     question_id = Column(UUID(as_uuid=True), ForeignKey("questions.id", ondelete="RESTRICT"), nullable=False, index=True)
     user_answer = Column(Text, nullable=True)           # submitted text or JSON string for MCQs
-    confidence = Column(Numeric(3, 2), nullable=True)  # 0.00–1.00
+    confidence = Column(Numeric(4, 2), nullable=True)  # 0.00–10.00
+    correctness_score = Column(Numeric(3, 2), nullable=True)  # 0.00-1.00
     evaluated_at = Column(TIMESTAMP(timezone=True), nullable=True)
 
 
