@@ -39,7 +39,7 @@ class SubmitAnswerRequest(BaseModel):
     quiz_session_id: UUID
     question_id: UUID
     user_answer: str  # For MCQ can be "A" or JSON array for DOUBLE_MCQ
-    confidence: float = Field(ge=0.0, le=1.0)
+    confidence: float = Field(ge=0.0, le=10.0)
     user_id: int  # Added for consistency
 
 
