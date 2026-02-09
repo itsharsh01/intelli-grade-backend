@@ -12,7 +12,6 @@ from engines.quiz_engine.schemas import QuizResultResponse
 
 from .schemas import ModuleCompleteResponse, ModuleStatusResponse, ModuleUnderstandingResponse
 
-
 def mark_module_complete(db: Session, user_id: int, module_id: UUID) -> ModuleCompleteResponse:
     """Mark a module as complete for the user (upsert). Unlocks quiz."""
     now = datetime.now(timezone.utc)
@@ -30,6 +29,7 @@ def mark_module_complete(db: Session, user_id: int, module_id: UUID) -> ModuleCo
     return ModuleCompleteResponse(
         module_id=row.module_id,
         completed_at=row.completed_at.isoformat(),
+        user_id=row.user_id
     )
 
 
@@ -40,11 +40,12 @@ def get_module_status(db: Session, user_id: int, module_id: UUID) -> ModuleStatu
         UserModuleCompletion.module_id == module_id,
     ).first()
     if not row:
-        return ModuleStatusResponse(module_id=module_id, completed=False, completed_at=None)
+        return ModuleStatusResponse(module_id=module_id, completed=False, completed_at=None, user_id=user_id)
     return ModuleStatusResponse(
         module_id=module_id,
         completed=True,
         completed_at=row.completed_at.isoformat() if row.completed_at else None,
+        user_id=user_id
     )
 
 

@@ -1,4 +1,3 @@
-"""Schemas for progress/completion and module understanding."""
 from uuid import UUID
 from pydantic import BaseModel
 
@@ -6,12 +5,14 @@ from pydantic import BaseModel
 class ModuleCompleteResponse(BaseModel):
     module_id: UUID
     completed_at: str  # ISO datetime
+    user_id: int 
 
 
 class ModuleStatusResponse(BaseModel):
     module_id: UUID
     completed: bool
     completed_at: str | None = None
+    user_id: int
 
 
 class ModuleUnderstandingResponse(BaseModel):

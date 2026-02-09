@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field
 
 class StartQuizRequest(BaseModel):
     module_id: UUID
-    user_id: int  # Added to bypass auth dependency for testing
 
 
 class QuizQuestionOut(BaseModel):
@@ -40,7 +39,6 @@ class SubmitAnswerRequest(BaseModel):
     question_id: UUID
     user_answer: str  # For MCQ can be "A" or JSON array for DOUBLE_MCQ
     confidence: float = Field(ge=0.0, le=1.0)
-    user_id: int  # Added for consistency
 
 
 class SubmitAnswerResponse(BaseModel):
