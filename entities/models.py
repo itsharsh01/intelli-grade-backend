@@ -27,6 +27,7 @@ class ModuleContent(Base):
     id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
     content = Column(String, nullable=True)
+    module_context = Column(JSON, nullable=True)
     title = Column(String, nullable=True)
 
 
@@ -149,3 +150,13 @@ class CourseUser(Base):
     user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     course_id = Column(UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
     joined_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())
+
+
+class CourseModule(Base):
+    __tablename__ = "course_modules"
+    
+    id = Column(UUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    course_id = Column(UUID(as_uuid=True), ForeignKey("courses.id", ondelete="CASCADE"), nullable=False)
+    module_content_id = Column(UUID(as_uuid=True), ForeignKey("module_content.id", ondelete="CASCADE"), nullable=False)
+    module_order = Column(Integer, default=0)
+    created_at = Column(TIMESTAMP(timezone=True), nullable=False, server_default=func.now())

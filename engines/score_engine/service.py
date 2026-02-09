@@ -1,7 +1,7 @@
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-from entities.models import Score
-from .schemas import ScoreCreate, ModuleScoreSummary
+from entities.models import Score, Course, CourseUser, CourseModule
+from .schemas import ScoreCreate, ModuleScoreSummary, CourseScoreSummary
 from typing import List, Dict
 from uuid import UUID
 
@@ -124,3 +124,87 @@ def calculate_user_module_scores(db: Session, user_id: int) -> List[ModuleScoreS
         summary_list.append(summary)
         
     return summary_list
+
+def calculate_user_course_scores(db: Session, user_id: int) -> List[CourseScoreSummary]:
+    # 1. Get user courses
+    user_courses = db.query(Course).join(CourseUser).filter(CourseUser.user_id == user_id).all()
+    
+    if not user_courses:
+        return []
+        
+    # 2. Get all module scores for user
+    module_scores = calculate_user_module_scores(db, user_id)
+    module_score_map = {m.module_content_id: m for m in module_scores}
+    
+    course_summaries = []
+    
+    for course in user_courses:
+        # Get modules for this course
+        modules = db.query(CourseModule).filter(CourseModule.course_id == course.id).all()
+        total_modules_count = len(modules)
+        
+        if total_modules_count == 0:
+            # Handle empty course
+            course_summaries.append(CourseScoreSummary(
+                course_id=course.id,
+                course_name=course.title,
+                total_score=0.0,
+                color_grade="yellow", # Default
+                question_completion_score=0.0,
+                evaluation_score=0.0,
+                conversation_score=0.0,
+                evaluation_count=0,
+                conversation_count=0
+            ))
+            continue
+            
+        # Aggregate logic
+        sum_total_score = 0.0
+        sum_completion = 0.0
+        sum_evaluation = 0.0
+        sum_conversation = 0.0
+        tot_eval_count = 0
+        tot_conv_count = 0
+        
+        for mod in modules:
+            m_score = module_score_map.get(mod.module_content_id)
+            if m_score:
+                sum_total_score += m_score.total_score
+                sum_completion += m_score.question_completion_score
+                sum_evaluation += m_score.evaluation_score
+                sum_conversation += m_score.conversation_score
+                tot_eval_count += m_score.evaluation_count
+                tot_conv_count += m_score.conversation_count
+            else:
+                # Unattempted module contributes 0 to scores
+                pass
+                
+        # Calculate Averages over TOTAL modules (as requested "how many modules are there also affect")
+        avg_total = sum_total_score / total_modules_count
+        avg_completion = sum_completion / total_modules_count
+        avg_evaluation = sum_evaluation / total_modules_count
+        avg_conversation = sum_conversation / total_modules_count
+        
+        # Determine Color Grade for Course
+        if avg_total < 0.25:
+            color = "yellow"
+        elif avg_total < 0.50:
+            color = "blue"
+        elif avg_total < 0.75:
+            color = "orange"
+        else:
+            color = "red"
+            
+        course_summaries.append(CourseScoreSummary(
+            course_id=course.id,
+            course_name=course.title,
+            total_score=avg_total,
+            color_grade=color,
+            question_completion_score=avg_completion,
+            evaluation_score=avg_evaluation,
+            conversation_score=avg_conversation,
+            evaluation_count=tot_eval_count,
+            conversation_count=tot_conv_count
+        ))
+        
+    return course_summaries

@@ -34,3 +34,20 @@ class ModuleScoreSummary(BaseModel):
     conversation_count: int = 0
     
     model_config = ConfigDict(from_attributes=True)
+
+class CourseScoreSummary(BaseModel):
+    course_id: UUID4
+    course_name: str
+    
+    # Aggregated Scores
+    total_score: float = 0.0
+    color_grade: str
+    
+    question_completion_score: float = 0.5
+    evaluation_score: float = 0.0
+    conversation_score: float = 0.0
+    
+    evaluation_count: int = 0
+    conversation_count: int = 0
+    
+    model_config = ConfigDict(from_attributes=True)
